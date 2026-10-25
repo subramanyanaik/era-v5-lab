@@ -9,6 +9,7 @@ import random
 from collections import defaultdict
 from itertools import combinations
 
+import pytest
 import torch
 from forward import CAUSES, code_digest, codes, decode_style_bytes, pair_cause, truncate
 
@@ -18,6 +19,10 @@ POOL = list("aZ5-_ ") + ["é", "ñ", "ಕ", "ನ", "್", "ಡ", "ಾ", "ಿ", "
 
 def random_word(rng):
     return "".join(rng.choice(POOL) for _ in range(rng.randrange(1, 26))).encode("utf-8")
+
+
+def w_long(rng):
+    return ("ಕನ್ನಡ" * rng.randrange(8, 12)).encode("utf-8") + random_word(rng)
 
 
 def synthetic_vocab(rng):
@@ -43,16 +48,19 @@ def synthetic_vocab(rng):
     add(b"<s>")                                                     # special token and ordinary text, same bytes
     for frag in (b"\xe0\xb2", b"\x95", b"\xa8", b"\xb2\x95", b"\xe0"):
         add(frag, decode_style_bytes(frag))                         # partial letters: decode gives U+FFFD
+    for _ in range(6):
+        add(b"\x95" + w_long(rng))                                  # long, start with a stray tail byte: repository rule cuts to nothing
     add(b"")
     add(b"")                                                        # empty tokens
     return vocab
 
 
-def test_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause():
+@pytest.mark.parametrize("rule", ["repo", "proposed"])
+def test_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause(rule):
     vocab = synthetic_vocab(random.Random(7))
     seen = set()
     for P in PS:
-        cuts = [truncate(fed, P) for _, fed in vocab]
+        cuts = [truncate(fed, P, rule) for _, fed in vocab]
         for dtype in (torch.float32, torch.bfloat16):
             digests = []
             for i in range(0, len(cuts), 500):
@@ -67,10 +75,11 @@ def test_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause()
             if dtype is torch.float32:
                 for g in by_code.values():
                     for a, b in combinations(sorted(g), 2):
-                        cause = pair_cause(vocab[a][0], vocab[b][0], vocab[a][1], vocab[b][1], P)
+                        cause = pair_cause(vocab[a][0], vocab[b][0], vocab[a][1], vocab[b][1], P, rule)
                         assert cause in CAUSES, (P, a, b)
                         seen.add(cause)
-    assert seen == set(CAUSES)  # the synthetic vocabulary really contains every cause
+    # the synthetic vocabulary really contains every cause; the proposed rule never cuts a token to nothing
+    assert seen == set(CAUSES) - ({"cut_to_empty"} if rule == "proposed" else set())
 
 
 def test_pair_cause_is_none_when_codes_differ():
@@ -79,3 +88,7 @@ def test_pair_cause_is_none_when_codes_differ():
     assert pair_cause(b"<s>", b"<s>", b"<s>", b"<s>", 32) == "same_raw"
     assert pair_cause(b"\xe0\xb2", b"\x95", "�".encode(), "�".encode(), 32) == "bad_bytes_in"
     assert pair_cause(b"", b"", b"", b"", 32) == "empty"
+    # two long tokens that start with a stray tail byte: the repository rule cuts both to nothing
+    a, b = b"\x95" + b"a" * 40, b"\xa8" + b"b" * 40
+    assert pair_cause(a, b, a, b, 32) == "cut_to_empty"
+    assert pair_cause(a, b, a, b, 32, "proposed") is None

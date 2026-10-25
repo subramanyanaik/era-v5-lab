@@ -4,7 +4,7 @@ The codec itself is the one in the public kronecker-embeddings repository
 (kronecker_embeddings.codec.kronecker_codec). This module adds what the proof in
 proof.md needs on top of it:
 
-  truncate        the cut rule from Lemma 2 (never returns empty for a non-empty token)
+  truncate        the cut rule from Lemma 2: the repository rule by default, our proposed variant with rule="proposed"
   codes           codes for a list of byte strings, using the repository codec
   read_support    reads the bytes back from a code (the argument of Lemma 1)
   expected_values closed-form high and low value of a code (Lemma 1)
@@ -17,19 +17,27 @@ import hashlib
 
 import torch
 from kronecker_embeddings.codec import kronecker_codec
+from kronecker_embeddings.tokenizer_utils import utf8_safe_truncate
 
 EPS = 1e-6  # the repository default for the z-norm denominator
-CAUSES = ("empty", "same_raw", "bad_bytes_in", "truncation")
+CAUSES = ("empty", "cut_to_empty", "same_raw", "bad_bytes_in", "truncation")
 
 
-def truncate(raw: bytes, P: int) -> bytes:
-    """Cut a token's raw bytes to at most P bytes without splitting a UTF-8 letter.
+def repo_truncate(raw: bytes, P: int) -> bytes:
+    """The repository rule (utf8_safe_truncate): the first of the prefixes of length P, P-1, P-2, P-3
+    that is valid UTF-8, else b"". A token longer than P that has no such prefix (for example one
+    that starts with a stray tail byte) becomes b"" and gets the all-zero code."""
+    return utf8_safe_truncate(raw, P)
+
+
+def proposed_truncate(raw: bytes, P: int) -> bytes:
+    """Our proposed fix: cut to at most P bytes without splitting a UTF-8 letter, but keep the bytes.
 
     Try the cut positions P, P-1, P-2, P-3 in that order. Take the first one where the
     byte at the cut is not a continuation byte (0x80-0xBF), and keep everything before it.
     If none of the four works (a run of stray continuation bytes), cut at exactly P.
-    Unlike utf8_safe_truncate in the repository, this never asks whether the prefix is
-    valid UTF-8, so a token that is itself a partial character is not turned into b"".
+    It never asks whether the prefix is valid UTF-8, so a non-empty token is never cut to nothing.
+    Equal to the repository rule on valid UTF-8.
     """
     if len(raw) <= P:
         return raw
@@ -37,6 +45,14 @@ def truncate(raw: bytes, P: int) -> bytes:
         if (raw[c] & 0xC0) != 0x80:
             return raw[:c]
     return raw[:P]
+
+
+RULES = {"repo": repo_truncate, "proposed": proposed_truncate}
+
+
+def truncate(raw: bytes, P: int, rule: str = "repo") -> bytes:
+    """The cut used by the proof. The default is the repository rule; rule="proposed" is our variant."""
+    return RULES[rule](raw, P)
 
 
 def codes(strings: list[bytes], P: int, dtype: torch.dtype = torch.float32) -> torch.Tensor:
@@ -95,17 +111,18 @@ def decode_style_bytes(raw: bytes) -> bytes:
     return raw.decode("utf-8", errors="replace").encode("utf-8")
 
 
-def pair_cause(raw_a: bytes, raw_b: bytes, fed_a: bytes, fed_b: bytes, P: int) -> str | None:
+def pair_cause(raw_a: bytes, raw_b: bytes, fed_a: bytes, fed_b: bytes, P: int, rule: str = "repo") -> str | None:
     """Why do two tokens share a code? None if they do not.
 
     raw_*  the token's real vocabulary bytes
     fed_*  the bytes the table feeds to the codec (equal to raw_* for the raw byte table)
+    rule   the cut rule, "repo" or "proposed"
     """
-    cut_a, cut_b = truncate(fed_a, P), truncate(fed_b, P)
+    cut_a, cut_b = truncate(fed_a, P, rule), truncate(fed_b, P, rule)
     if cut_a != cut_b:
         return None
     if not cut_a:
-        return "empty"
+        return "empty" if not fed_a and not fed_b else "cut_to_empty"
     if raw_a == raw_b:
         return "same_raw"
     if fed_a == fed_b:

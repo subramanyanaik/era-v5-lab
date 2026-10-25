@@ -4,13 +4,15 @@ Lemma 1, Lemma 2 and Theorem 1 for the Kronecker codec, with numerical checks.
 Tests: `pytest teams/04-ke2/theorem/theorem1 -q` (needs the kronecker-embeddings package, see the end).
 
 **Provenance.** The codec is the one in https://github.com/theschoolofai/kronecker-embeddings
-(`kronecker_embeddings/codec.py`, V1 paper arXiv:2605.29459, section 3). The statements, proofs and the cut rule in
-Lemma 2 are written for this lab. The paper states no lemmas. The statements are proposals and are open to change.
+(`kronecker_embeddings/codec.py`, V1 paper arXiv:2605.29459, section 3). The statements and proofs are
+written for this lab. The paper states no lemmas. The statements are proposals and are open to change.
+The cut rule used in Lemma 2 is the repository's own (`utf8_safe_truncate`). A variant that keeps the bytes of tokens that are not
+valid UTF-8 is described as a possible fix in section 2.
 
 ## 0. Setup and notation
 
 - P is 32 or 64 (`pos_dim`). The alphabet has 256 byte values, so a code has D = 256P entries.
-- A token has raw bytes r (its real vocabulary bytes). The codec sees the cut string s = tau_P(r), with |s| = L <= P.
+- A token has raw bytes r (its real vocabulary bytes). The codec sees the cut string s = tau_P(r), with |s| = L <= P (tau_P is the repository cut rule, section 2).
   |s| is the number of bytes of s.
 - Code of s = s_0 ... s_{L-1}, as in `kronecker_codec`:
   1. Make a vector x of length D with x[s_p * P + p] = 1/sqrt(L) for p = 0 .. L-1, and 0 elsewhere.
@@ -56,52 +58,63 @@ values of that size is at most 0.5.
 
 ## 2. Lemma 2: the cut to P is safe and predictable
 
-**The rule tau_P(r).**
+**The rule tau_P(r)** (the repository's `utf8_safe_truncate`):
 1. If |r| <= P, return r.
-2. Otherwise try c = P, P-1, P-2, P-3 in that order. Return r[0:c] for the first c where the byte r[c] is not a
-   continuation byte (a byte in 0x80 .. 0xBF).
-3. If none of the four works, return r[0:P].
+2. Otherwise try c = P, P-1, P-2, P-3 in that order. Return r[0:c] for the first c where r[0:c] is valid UTF-8.
+3. If none of the four is valid, return the empty string.
 
 **Statement.** For every byte string r and P >= 4:
 (a) tau_P(r) is a prefix of r.
 (b) If |r| <= P then tau_P(r) = r.
-(c) If |r| > P then P - 3 <= |tau_P(r)| <= P. In particular a non-empty token is never cut to nothing.
-(d) If r is valid UTF-8, then tau_P(r) is valid UTF-8, so no letter is split.
+(c) If |r| > P then tau_P(r) is empty or P - 3 <= |tau_P(r)| <= P.
+(d) If r is valid UTF-8, then tau_P(r) is valid UTF-8 and not empty, so no letter is split and a valid token is never cut to nothing.
 (e) tau_P(tau_P(r)) = tau_P(r).
+(f) If |r| > P and tau_P(r) is empty, then r is not valid UTF-8.
 
-**Proof.** (a) and (b): we only return r[0:c] with c <= |r|, or all of r. (c): c is one of P, P-1, P-2, P-3. (e): the
-result has length <= P, so rule 1 returns it unchanged.
-(d): let r be valid UTF-8 with |r| > P. A letter has at most 4 bytes: a lead byte, then at most 3 continuation bytes.
-If r[P] is not a continuation byte, then c = P is chosen, and a cut just before a lead byte or an ASCII byte falls
-between letters. If r[P] is a continuation byte, then the letter that contains it starts at some q with P - 3 <= q < P,
-and the bytes r[q+1] .. r[P] are all continuation bytes. Going down from P, the first position that is not a continuation
-byte is q, so c = q, and the cut again falls between letters. QED
+**Proof.** (a), (b), (c): we return r[0:c] with c one of P, P-1, P-2, P-3, or all of r, or the empty string. (e): the
+result has length <= P, so rule 1 returns it unchanged. (f) is (d) read backwards.
+(d): let r be valid UTF-8 with |r| > P. A prefix of a valid string is valid exactly when the cut falls between letters, that is,
+when r[c] is not a continuation byte (a byte in 0x80 .. 0xBF). A letter has at most 4 bytes: a lead byte, then at most 3
+continuation bytes. If r[P] is not a continuation byte, c = P is valid. Otherwise the letter that contains r[P] starts at some
+q with P - 3 <= q < P, and r[q+1] .. r[P] are all continuation bytes; going down from P, the first position that is not a
+continuation byte is q, so some c in P, P-1, P-2, P-3 is valid, and the first valid one is returned. QED
 
-**Why not the repository rule.** `utf8_safe_truncate` keeps the first of the four prefixes that decodes as valid
-UTF-8, else returns `b""`. On valid UTF-8 it returns the same result as tau_P (a prefix is valid exactly when it ends
-at a letter boundary). On a token that is not valid UTF-8, such as one that starts with the last byte of a letter,
-no prefix is valid, so it returns `b""` and the token gets the all-zero code.
+**Where it empties a token.** A token longer than P bytes that is not valid UTF-8 can have no valid prefix among the four, for
+example one that starts with the tail byte of a letter. Then tau_P(r) is empty and the token gets the all-zero code, the same code
+as every other such token and as the empty token. Example, P = 32, a 36-byte token (a stray tail byte `95`, twenty `a`, then the
+Kannada letters ka, na, virama, na, da):
+
+```
+95 | 61 x20 | e0 b2 95 | e0 b2 a8 | e0 b3 8d | e0 b2 a8 | e0 b2 a1
+```
+
+The repository rule returns 0 bytes (no prefix is valid UTF-8, because every prefix starts with `95`).
+
+**Possible fix (proposal, not in the repository).** tau'_P(r): if |r| <= P return r; otherwise take the first c in P, P-1, P-2, P-3
+where r[c] is not a continuation byte and return r[0:c]; if there is none, return r[0:P]. It keeps the bytes of tokens that are
+not valid UTF-8 and never cuts a non-empty token to nothing: (a), (b), (c) with no empty case, and (e) hold, and tau'_P(r) =
+tau_P(r) on valid UTF-8. On the 36-byte token above it returns 30 bytes (`95`, twenty `a`, ka, na, virama). Theorem 1 holds for
+tau'_P in the same way, and the tests check both rules. Whether the KE2 code should keep or empty such tokens is a question for TSAI.
 
 **Note on the real vocabulary.** BrahmicTokenizer-131K has no ordinary token longer than 32 bytes (longest: 32; special tokens: at most 20),
-so for P = 32 and P = 64 the cut rule never fires on it and tau_P(r) = r for every token (section 4). The lemma is still needed for
+so for P = 32 and P = 64 neither rule cuts anything and tau_P(r) = r for every token (section 4). The lemma is still needed for
 smaller P, for other tokenizers, and for the provisional tokenizer from G3 (due 28 Oct), whose longest token is not yet known.
 
 **Numerical checks** (`test_lemma2.py`):
 
 | Check | Size | Result |
 |---|---|---|
-| (a), (b), (c), (e) on raw bytes, half of them continuation bytes | P = 32, 64; 5,000 strings each, lengths 0 to 199 | pass |
-| (d) and equal to the repository rule on valid UTF-8 (Latin, accents, Kannada, Devanagari, CJK, emoji, ZWJ) | P = 32, 64; 5,000 strings each (more than 500 longer than P) | pass |
-| a non-empty token never becomes empty | P = 32, 64; 5,000 strings each | pass |
-| repository rule returns empty for a 73-byte token that starts with `95`; this rule keeps 29 to 32 bytes | one token, P = 32 | pass |
-
+| (a), (b), (c), (e) for both rules, on raw bytes, half of them continuation bytes | P = 32, 64; 5,000 strings each, lengths 0 to 199 | pass |
+| (d): valid UTF-8 stays valid, is never emptied, and both rules agree with `utf8_safe_truncate` (Latin, accents, Kannada, Devanagari, CJK, emoji, ZWJ) | P = 32, 64; 5,000 strings each (more than 500 longer than P) | pass |
+| repository rule: a cut token is empty or valid UTF-8 (f); more than 500 strings per P really hit the empty case; the proposed rule never returns empty for a non-empty token | P = 32, 64; 5,000 strings each | pass |
+| the 36-byte example: repository rule returns 0 bytes, proposed rule returns 30 | one token, P = 32 | pass |
 ## 3. Theorem 1: the codec never causes a collision
 
 **Statement.** Let r, r' be the byte strings that a table feeds to the codec for two tokens (the raw vocabulary bytes in the
 raw byte table). Then code(tau_P(r)) = code(tau_P(r')) if and only if tau_P(r) = tau_P(r').
 
-**Proof.** (if) The code is a function of the string. (only if) By Lemma 2 (c), both cut strings have at most P bytes,
-so Lemma 1 applies. QED
+**Proof.** (if) The code is a function of the string. (only if) By Lemma 2 (c), both cut strings have at most P bytes
+(the empty string is covered by Lemma 1, step 6), so Lemma 1 applies. QED. The same proof works for tau'_P.
 
 **Scope.** The theorem is about the strings that a table feeds to the codec. It does not say what a given way of building the table
 feeds. If the table is built with `decode([id])`, partial-letter tokens are fed as U+FFFD and collide (section 4). That is a
@@ -113,7 +126,8 @@ exactly one of:
 
 | Cause | Condition |
 |---|---|
-| `empty` | the cut string is empty (an empty token; the cut never empties a non-empty token) |
+| `empty` | both fed strings are empty (empty tokens) |
+| `cut_to_empty` | the cut string is empty but a fed string is not (a long token that is not valid UTF-8, repository rule only; Lemma 2) |
 | `same_raw` | r = r' (duplicate surface forms, a special token with the text of an ordinary token, an agreed marker policy) |
 | `bad_bytes_in` | r != r' but f = f' (for example U+FFFD from `decode([id])`; not possible in the raw byte table) |
 | `truncation` | f != f' but tau_P(f) = tau_P(f') (both longer than P with the same start) |
@@ -122,15 +136,15 @@ A group of more than two tokens that share a code can mix these causes, one per 
 
 **Numerical checks** (`test_theorem1.py`), on a synthetic vocabulary of about 1,800 tokens that contains every cause
 (families that share a long start, runs of `-` of length 33 to 74, exact duplicates, `<s>` twice, partial letters with
-U+FFFD bytes, empty tokens):
+U+FFFD bytes, long tokens that start with a stray tail byte, empty tokens). Run for both cut rules:
 
 | Check | Result |
 |---|---|
 | the grouping of tokens by code equals the grouping by cut string, P = 32 and 64, fp32 and bf16 | pass |
-| every pair of tokens that share a code gets one of the four causes, and all four causes occur | pass |
+| every pair of tokens that share a code gets one of the five causes; all five occur with the repository rule, and all but `cut_to_empty` with the proposed rule | pass |
 | `pair_cause` on small hand-made cases | pass |
 
-All 12 tests: `12 passed in 23 s` (CPU, torch).
+All 13 synthetic-data tests: `13 passed` (CPU, torch).
 
 ## 4. The real tokenizer, and what this does not cover
 
@@ -144,15 +158,15 @@ byte-to-unicode map. The code is `real_tokenizer_check.py` (uses `forward.py`) a
 | `decode([id])` bytes from the repo's `token_id_to_bytes` and the real `tokenizers` decoder | 32 and 64 | 129,931 | 1,141 in 10 groups (largest 658, 396, 82) | all `bad_bytes_in` |
 
 - Groups by code equal groups by cut string in all four cases, as Theorem 1 says. Every pair in the 10 groups has the cause `bad_bytes_in`;
-  `empty`, `same_raw` and `truncation` do not occur.
+  `empty`, `cut_to_empty`, `same_raw` and `truncation` do not occur.
 - The longest ordinary token is 32 bytes (none over 32), so P = 32 and P = 64 give identical results and no token is cut.
 - 1,306 tokens (1.0%) hold only part of a letter (not valid UTF-8). 197 of them start with a stray continuation byte. Only 16 touch the
   Kannada lead bytes `E0 B2` / `E0 B3`. The real U+FFFD token is id 99666.
 - Hash of the raw table (for each id: the id as 4 bytes, the length as 2 bytes, then the bytes): `18c7f6a382fd6668ec73f56e589fbfbc13fec7c6ad5403a2d79ba6198ecc0d3c`.
 
 **Not covered.**
-- **The decoder is `tokenizers` 0.23.1,** the Rust engine behind HF fast tokenizers, called through a thin adapter (only the four named specials take the literal-text path). `transformers` itself was not run. The bytes fed equal a plain model (invalid bytes replaced by U+FFFD) for all 131,072 ids. The repo's `utf8_safe_truncate` gives the same groups as tau_P here.
-- **Lemma 2's cut branch** is checked only on random and synthetic strings, since no real token is longer than 32 bytes.
+- **The decoder is `tokenizers` 0.23.1,** the Rust engine behind HF fast tokenizers, called through a thin adapter (only the four named specials take the literal-text path). `transformers` itself was not run. The bytes fed equal a plain model (invalid bytes replaced by U+FFFD) for all 131,072 ids. The cut rule in these runs is the repository's; the proposed rule gives the same groups here.
+- **Lemma 2's cut branch** (both rules) is checked only on random and synthetic strings, since no real token is longer than 32 bytes.
 - **Special tokens** are included here as their literal text. The final policy (the G10 list, due 31 Oct) can change what is fed to the
   codec, but not the theorem. Whether to keep `<s>` text and the special token apart is a policy decision.
 - **Normalisation.** NFC or NFKC changes the bytes, so it changes the codes. The tokenizer has no normalizer, so this happens in the data pipeline. The proof starts from the bytes.
@@ -180,4 +194,4 @@ set PYTHONPATH=<path to kronecker-embeddings>/src
 python teams/04-ke2/theorem/theorem1/real_tokenizer_check.py %BRAHMIC_TOKENIZER_DIR% results.json
 ```
 
-Section 4 gives the expected numbers. All 16 tests pass together with the tokenizer (`16 passed in 144 s`); without it, 12 run and 4 are skipped.
+Section 4 gives the expected numbers. All 17 tests pass together with the tokenizer (`17 passed in 143 s`); without it, 13 run and 4 are skipped.
