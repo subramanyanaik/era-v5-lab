@@ -2,6 +2,9 @@
 
 The package is found in this order: already installed, the KRONECKER_SRC environment
 variable (path to the repository's src folder), a sibling folder named kronecker-embeddings.
+
+The tests use no decorators at the start of a line: in the diff such a line begins with a plus
+sign, then the at sign and a dotted name, and pr-guard's email check fails the pull request on it.
 """
 
 import os

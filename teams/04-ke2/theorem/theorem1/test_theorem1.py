@@ -2,14 +2,13 @@
 
 The corollary: every pair of tokens that share a code has a named cause.
 The vocabulary here is synthetic and built to contain every cause. The same check runs on the real
-tokenizer in build_tables.py once the vocabulary is available.
+tokenizer in real_tokenizer_check.py (test_real_tokenizer.py).
 """
 
 import random
 from collections import defaultdict
 from itertools import combinations
 
-import pytest
 import torch
 from forward import CAUSES, code_digest, codes, decode_style_bytes, pair_cause, truncate
 
@@ -55,9 +54,9 @@ def synthetic_vocab(rng):
     return vocab
 
 
-@pytest.mark.parametrize("rule", ["repo", "proposed"])
-def test_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause(rule):
+def check_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause(rule):
     vocab = synthetic_vocab(random.Random(7))
+    assert len(vocab) == 1717
     seen = set()
     for P in PS:
         cuts = [truncate(fed, P, rule) for _, fed in vocab]
@@ -82,9 +81,19 @@ def test_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause(r
     assert seen == set(CAUSES) - ({"cut_to_empty"} if rule == "proposed" else set())
 
 
+def test_theorem1_with_the_repository_cut_rule():
+    check_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause("repo")
+
+
+def test_theorem1_with_the_proposed_cut_rule():
+    check_shared_codes_are_exactly_equal_cut_strings_and_every_pair_has_a_cause("proposed")
+
+
 def test_pair_cause_is_none_when_codes_differ():
     assert pair_cause(b"ab", b"ac", b"ab", b"ac", 32) is None
     assert pair_cause(b"a" * 40, b"a" * 40 + b"b", b"a" * 40, b"a" * 40 + b"b", 32) == "truncation"
+    short, longer = b"a" * 30, b"a" * 30 + "ಕ".encode()             # only one is longer than P: 33 bytes cut back to 30
+    assert pair_cause(short, longer, short, longer, 32) == "truncation"
     assert pair_cause(b"<s>", b"<s>", b"<s>", b"<s>", 32) == "same_raw"
     assert pair_cause(b"\xe0\xb2", b"\x95", "�".encode(), "�".encode(), 32) == "bad_bytes_in"
     assert pair_cause(b"", b"", b"", b"", 32) == "empty"

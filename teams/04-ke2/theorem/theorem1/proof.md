@@ -66,12 +66,12 @@ values of that size is at most 0.5.
 **Statement.** For every byte string r and P >= 4:
 (a) tau_P(r) is a prefix of r.
 (b) If |r| <= P then tau_P(r) = r.
-(c) If |r| > P then tau_P(r) is empty or P - 3 <= |tau_P(r)| <= P.
+(c) If |r| > P then tau_P(r) is valid UTF-8, and it is empty or has P - 3 to P bytes.
 (d) If r is valid UTF-8, then tau_P(r) is valid UTF-8 and not empty, so no letter is split and a valid token is never cut to nothing.
 (e) tau_P(tau_P(r)) = tau_P(r).
 (f) If |r| > P and tau_P(r) is empty, then r is not valid UTF-8.
 
-**Proof.** (a), (b), (c): we return r[0:c] with c one of P, P-1, P-2, P-3, or all of r, or the empty string. (e): the
+**Proof.** (a), (b), (c): we return all of r, or a valid prefix r[0:c] with c one of P, P-1, P-2, P-3, or the empty string. (e): the
 result has length <= P, so rule 1 returns it unchanged. (f) is (d) read backwards.
 (d): let r be valid UTF-8 with |r| > P. A prefix of a valid string is valid exactly when the cut falls between letters, that is,
 when r[c] is not a continuation byte (a byte in 0x80 .. 0xBF). A letter has at most 4 bytes: a lead byte, then at most 3
@@ -90,6 +90,10 @@ Kannada letters ka, na, virama, na, da):
 
 The repository rule returns 0 bytes (no prefix is valid UTF-8, because every prefix starts with `95`).
 
+This cannot happen inside the repository's own pipeline (`build_byte_buffer`): there the bytes come from `decode([id])`, which is
+always valid UTF-8, so by (d) nothing is emptied. It can happen once the raw vocabulary bytes (the raw byte table) are fed to the
+repository rule, because a raw token can be invalid UTF-8.
+
 **Possible fix (proposal, not in the repository).** tau'_P(r): if |r| <= P return r; otherwise take the first c in P, P-1, P-2, P-3
 where r[c] is not a continuation byte and return r[0:c]; if there is none, return r[0:P]. It keeps the bytes of tokens that are
 not valid UTF-8 and never cuts a non-empty token to nothing: (a), (b), (c) with no empty case, and (e) hold, and tau'_P(r) =
@@ -106,14 +110,15 @@ smaller P, for other tokenizers, and for the provisional tokenizer from G3 (due 
 |---|---|---|
 | (a), (b), (c), (e) for both rules, on raw bytes, half of them continuation bytes | P = 32, 64; 5,000 strings each, lengths 0 to 199 | pass |
 | (d): valid UTF-8 stays valid, is never emptied, and both rules agree with `utf8_safe_truncate` (Latin, accents, Kannada, Devanagari, CJK, emoji, ZWJ) | P = 32, 64; 5,000 strings each (more than 500 longer than P) | pass |
-| repository rule: a cut token is empty or valid UTF-8 (f); more than 500 strings per P really hit the empty case; the proposed rule never returns empty for a non-empty token | P = 32, 64; 5,000 strings each | pass |
+| (c) repository rule: a cut token is empty or valid UTF-8; more than 500 strings per P really hit the empty case; the proposed rule never returns empty for a non-empty token | P = 32, 64; 5,000 strings each | pass |
 | the 36-byte example: repository rule returns 0 bytes, proposed rule returns 30 | one token, P = 32 | pass |
+
 ## 3. Theorem 1: the codec never causes a collision
 
 **Statement.** Let r, r' be the byte strings that a table feeds to the codec for two tokens (the raw vocabulary bytes in the
 raw byte table). Then code(tau_P(r)) = code(tau_P(r')) if and only if tau_P(r) = tau_P(r').
 
-**Proof.** (if) The code is a function of the string. (only if) By Lemma 2 (c), both cut strings have at most P bytes
+**Proof.** (if) The code is a function of the string. (only if) By Lemma 2 (b) and (c), both cut strings have at most P bytes
 (the empty string is covered by Lemma 1, step 6), so Lemma 1 applies. QED. The same proof works for tau'_P.
 
 **Scope.** The theorem is about the strings that a table feeds to the codec. It does not say what a given way of building the table
@@ -122,7 +127,7 @@ property of the table, not of the codec, and it is why the raw byte table uses t
 
 **Corollary (causes).** Two different tokens share a code only if the strings fed to the codec become equal after the cut.
 For a pair of tokens, with raw bytes r, r' and fed bytes f, f' (equal to r, r' in the raw byte table), the reason is
-exactly one of:
+the first of these that applies, in this order (`pair_cause` in `forward.py`):
 
 | Cause | Condition |
 |---|---|
@@ -130,11 +135,11 @@ exactly one of:
 | `cut_to_empty` | the cut string is empty but a fed string is not (a long token that is not valid UTF-8, repository rule only; Lemma 2) |
 | `same_raw` | r = r' (duplicate surface forms, a special token with the text of an ordinary token, an agreed marker policy) |
 | `bad_bytes_in` | r != r' but f = f' (for example U+FFFD from `decode([id])`; not possible in the raw byte table) |
-| `truncation` | f != f' but tau_P(f) = tau_P(f') (both longer than P with the same start) |
+| `truncation` | f != f' but tau_P(f) = tau_P(f') (at least one is longer than P, and they agree up to the cut) |
 
 A group of more than two tokens that share a code can mix these causes, one per pair.
 
-**Numerical checks** (`test_theorem1.py`), on a synthetic vocabulary of about 1,800 tokens that contains every cause
+**Numerical checks** (`test_theorem1.py`), on a synthetic vocabulary of 1,717 tokens that contains every cause
 (families that share a long start, runs of `-` of length 33 to 74, exact duplicates, `<s>` twice, partial letters with
 U+FFFD bytes, long tokens that start with a stray tail byte, empty tokens). Run for both cut rules:
 
@@ -155,13 +160,13 @@ byte-to-unicode map. The code is `real_tokenizer_check.py` (uses `forward.py`) a
 | Table fed to the codec | P | distinct codes (of 131,072) | tokens that cannot be produced | pair causes |
 |---|---|---|---|---|
 | raw vocabulary bytes | 32 and 64, fp32 and bf16 | 131,072 | 0 | none |
-| `decode([id])` bytes from the repo's `token_id_to_bytes` and the real `tokenizers` decoder | 32 and 64 | 129,931 | 1,141 in 10 groups (largest 658, 396, 82) | all `bad_bytes_in` |
+| `decode([id])` bytes from the repo's `token_id_to_bytes` and the real `tokenizers` decoder | 32 and 64, fp32 and bf16 | 129,931 | 1,141 in 10 groups (largest 658, 396, 82) | all `bad_bytes_in` |
 
 - Groups by code equal groups by cut string in all four cases, as Theorem 1 says. Every pair in the 10 groups has the cause `bad_bytes_in`;
   `empty`, `cut_to_empty`, `same_raw` and `truncation` do not occur.
 - The longest ordinary token is 32 bytes (none over 32), so P = 32 and P = 64 give identical results and no token is cut.
-- 1,306 tokens (1.0%) hold only part of a letter (not valid UTF-8). 197 of them start with a stray continuation byte. Only 16 touch the
-  Kannada lead bytes `E0 B2` / `E0 B3`. The real U+FFFD token is id 99666.
+- 1,306 tokens (1.0%) are not valid UTF-8 (they contain part of a letter). 197 of them start with a stray continuation byte. Only 16
+  contain the Kannada lead bytes `E0 B2` / `E0 B3`. The real U+FFFD token is id 99666.
 - Hash of the raw table (for each id: the id as 4 bytes, the length as 2 bytes, then the bytes): `18c7f6a382fd6668ec73f56e589fbfbc13fec7c6ad5403a2d79ba6198ecc0d3c`.
 
 **Not covered.**
@@ -172,13 +177,16 @@ byte-to-unicode map. The code is `real_tokenizer_check.py` (uses `forward.py`) a
 - **Normalisation.** NFC or NFKC changes the bytes, so it changes the codes. The tokenizer has no normalizer, so this happens in the data pipeline. The proof starts from the bytes.
 - **Exact arithmetic.** The proof is exact. The checks cover fp32 and bf16 and show that the lit and unlit values stay apart.
 - **Decoding from a predicted vector** (noisy input, margins, tau) is week 2 and is not part of this proof.
+
 ## 5. Run it
+
+The commands use bash `export`; on Windows cmd use `set NAME=value`.
 
 ```
 git clone https://github.com/theschoolofai/kronecker-embeddings
 pip install torch pytest
 # either pip install -e kronecker-embeddings, or point the tests at its src folder:
-set KRONECKER_SRC=<path to kronecker-embeddings>/src
+export KRONECKER_SRC=<path to kronecker-embeddings>/src
 pytest teams/04-ke2/theorem/theorem1 -q
 ```
 
@@ -188,10 +196,10 @@ On the real tokenizer (needs `pip install tokenizers`; download `tokenizer.json`
 `special_tokens_map.json` from https://huggingface.co/theschoolofai/BrahmicTokenizer-131K into a folder outside this repository):
 
 ```
-set BRAHMIC_TOKENIZER_DIR=<that folder>
+export BRAHMIC_TOKENIZER_DIR=<that folder>
 pytest teams/04-ke2/theorem/theorem1/test_real_tokenizer.py -q          # skipped when the variable is not set
-set PYTHONPATH=<path to kronecker-embeddings>/src
-python teams/04-ke2/theorem/theorem1/real_tokenizer_check.py %BRAHMIC_TOKENIZER_DIR% results.json
+export PYTHONPATH=<path to kronecker-embeddings>/src
+python teams/04-ke2/theorem/theorem1/real_tokenizer_check.py $BRAHMIC_TOKENIZER_DIR results.json
 ```
 
-Section 4 gives the expected numbers. All 17 tests pass together with the tokenizer (`17 passed in 143 s`); without it, 13 run and 4 are skipped.
+Section 4 gives the expected numbers. With the tokenizer all 15 tests pass (about 2.5 minutes on CPU); without it, 13 pass and 2 are skipped.

@@ -106,7 +106,8 @@ def expected_values(L: int, P: int, eps: float = EPS) -> tuple[float, float]:
 def decode_style_bytes(raw: bytes) -> bytes:
     """A model of tokenizer.decode([id]).encode(): invalid bytes become U+FFFD.
 
-    Only a stand-in for tests. The real behaviour depends on the tokenizer.
+    A stand-in for tests. On BrahmicTokenizer-131K it equals the real `tokenizers` decoder for every id
+    (proof.md section 4); other tokenizers may differ.
     """
     return raw.decode("utf-8", errors="replace").encode("utf-8")
 

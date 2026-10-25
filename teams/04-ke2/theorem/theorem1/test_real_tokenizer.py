@@ -7,37 +7,41 @@ import os
 from pathlib import Path
 
 import pytest
+from forward import CAUSES
 
 tok_dir = os.environ.get("BRAHMIC_TOKENIZER_DIR")
 pytestmark = pytest.mark.skipif(
     not (tok_dir and (Path(tok_dir) / "tokenizer.json").is_file()),
     reason="set BRAHMIC_TOKENIZER_DIR to run on the real tokenizer",
 )
+_cache = {}
 
 
-@pytest.fixture(scope="module")
 def result():
-    pytest.importorskip("tokenizers")
-    from real_tokenizer_check import run
+    """Run the check once per test session (it takes about two minutes)."""
+    if "r" not in _cache:
+        pytest.importorskip("tokenizers")
+        from real_tokenizer_check import run
 
-    return run(Path(tok_dir))
-
-
-@pytest.mark.parametrize("P", [32, 64])
-def test_raw_table_has_no_collision(result, P):
-    for dtype in ("float32", "bfloat16"):
-        r = result[f"P{P}_raw"][dtype]
-        assert r["distinct_codes"] == result["vocab"]
-        assert r["partitions_equal"]
-    assert result[f"P{P}_raw"]["groups"] == 0
+        _cache["r"] = run(Path(tok_dir))
+    return _cache["r"]
 
 
-@pytest.mark.parametrize("P", [32, 64])
-def test_theorem1_on_decode_table(result, P):
-    for dtype in ("float32", "bfloat16"):
-        assert result[f"P{P}_decode"][dtype]["partitions_equal"]
-    from forward import CAUSES
+def test_raw_table_has_no_collision():
+    res = result()
+    for P in (32, 64):
+        for dtype in ("float32", "bfloat16"):
+            r = res[f"P{P}_raw"][dtype]
+            assert r["distinct_codes"] == res["vocab"], (P, dtype)
+            assert r["partitions_equal"], (P, dtype)
+        assert res[f"P{P}_raw"]["groups"] == 0, P
 
-    causes = result[f"P{P}_decode"]["pair_causes"]
-    assert None not in causes  # every colliding pair has a cause
-    assert set(causes) <= set(CAUSES)
+
+def test_theorem1_on_decode_table():
+    res = result()
+    for P in (32, 64):
+        for dtype in ("float32", "bfloat16"):
+            assert res[f"P{P}_decode"][dtype]["partitions_equal"], (P, dtype)
+        causes = res[f"P{P}_decode"]["pair_causes"]
+        assert None not in causes, P  # every colliding pair has a cause
+        assert set(causes) <= set(CAUSES), P
