@@ -1,7 +1,7 @@
 # KE2 week 1: forward encode proof
 
 Lemma 1, Lemma 2 and Theorem 1 for the Kronecker codec, with numerical checks.
-Tests: `pytest teams/04-ke2/tests -q` (needs the kronecker-embeddings package, see the end).
+Tests: `pytest teams/04-ke2/theorem/theorem1 -q` (needs the kronecker-embeddings package, see the end).
 
 **Provenance.** The codec is the one in https://github.com/theschoolofai/kronecker-embeddings
 (`kronecker_embeddings/codec.py`, V1 paper arXiv:2605.29459, section 3). The statements, proofs and the cut rule in
@@ -43,7 +43,7 @@ if h - u were smaller than the bf16 spacing. Since sigma <= 1/sqrt(D - 1) + eps,
 which is at least 15.9 for both P = 32 and P = 64 (the eps term changes it by less than 0.02%). The spacing of bf16 at
 values of that size is at most 0.5.
 
-**Numerical checks** (`tests/test_lemma1.py`):
+**Numerical checks** (`test_lemma1.py`):
 
 | Check | Size | Result |
 |---|---|---|
@@ -86,7 +86,7 @@ no prefix is valid, so it returns `b""` and the token gets the all-zero code.
 so for P = 32 and P = 64 the cut rule never fires on it and tau_P(r) = r for every token (section 4). The lemma is still needed for
 smaller P, for other tokenizers, and for the provisional tokenizer from G3 (due 28 Oct), whose longest token is not yet known.
 
-**Numerical checks** (`tests/test_lemma2.py`):
+**Numerical checks** (`test_lemma2.py`):
 
 | Check | Size | Result |
 |---|---|---|
@@ -120,7 +120,7 @@ exactly one of:
 
 A group of more than two tokens that share a code can mix these causes, one per pair.
 
-**Numerical checks** (`tests/test_theorem1.py`), on a synthetic vocabulary of about 1,800 tokens that contains every cause
+**Numerical checks** (`test_theorem1.py`), on a synthetic vocabulary of about 1,800 tokens that contains every cause
 (families that share a long start, runs of `-` of length 33 to 74, exact duplicates, `<s>` twice, partial letters with
 U+FFFD bytes, empty tokens):
 
@@ -136,7 +136,7 @@ All 12 tests: `12 passed in 23 s` (CPU, torch).
 
 **BrahmicTokenizer-131K** (`tokenizer.json` sha256 `01d968a7970b029c071b29f060abf6104b66168dedf2ff3b1a0290a545739fff`, 131,072 ids,
 356 special tokens, normalizer null, no byte fallback). Raw bytes come from the vocabulary strings by inverting the GPT-2
-byte-to-unicode map. The code is `src/real_tokenizer_check.py` (uses `src/forward.py`) and `tests/test_real_tokenizer.py`; run them as in section 5. The tokenizer files are not in this repository.
+byte-to-unicode map. The code is `real_tokenizer_check.py` (uses `forward.py`) and `test_real_tokenizer.py`; run them as in section 5. The tokenizer files are not in this repository.
 
 | Table fed to the codec | P | distinct codes (of 131,072) | tokens that cannot be produced | pair causes |
 |---|---|---|---|---|
@@ -165,19 +165,19 @@ git clone https://github.com/theschoolofai/kronecker-embeddings
 pip install torch pytest
 # either pip install -e kronecker-embeddings, or point the tests at its src folder:
 set KRONECKER_SRC=<path to kronecker-embeddings>/src
-pytest teams/04-ke2/tests -q
+pytest teams/04-ke2/theorem/theorem1 -q
 ```
 
-`tests/conftest.py` also finds a folder named `kronecker-embeddings` next to the lab repository.
+`conftest.py` also finds a folder named `kronecker-embeddings` next to the lab repository.
 
 On the real tokenizer (needs `pip install tokenizers`; download `tokenizer.json`, `tokenizer_config.json` and
 `special_tokens_map.json` from https://huggingface.co/theschoolofai/BrahmicTokenizer-131K into a folder outside this repository):
 
 ```
 set BRAHMIC_TOKENIZER_DIR=<that folder>
-pytest teams/04-ke2/tests/test_real_tokenizer.py -q          # skipped when the variable is not set
+pytest teams/04-ke2/theorem/theorem1/test_real_tokenizer.py -q          # skipped when the variable is not set
 set PYTHONPATH=<path to kronecker-embeddings>/src
-python teams/04-ke2/src/real_tokenizer_check.py %BRAHMIC_TOKENIZER_DIR% results.json
+python teams/04-ke2/theorem/theorem1/real_tokenizer_check.py %BRAHMIC_TOKENIZER_DIR% results.json
 ```
 
 Section 4 gives the expected numbers. All 16 tests pass together with the tokenizer (`16 passed in 144 s`); without it, 12 run and 4 are skipped.

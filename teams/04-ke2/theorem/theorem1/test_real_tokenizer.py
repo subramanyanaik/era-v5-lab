@@ -1,4 +1,4 @@
-"""Theorem 1 on the real tokenizer (docs/proof.md section 4).
+"""Theorem 1 on the real tokenizer (proof.md section 4).
 
 Skipped unless BRAHMIC_TOKENIZER_DIR points to a folder with tokenizer.json and special_tokens_map.json.
 """

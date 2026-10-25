@@ -1,4 +1,4 @@
-"""Theorem 1 on a real tokenizer.json (byte-level BPE, e.g. BrahmicTokenizer-131K). See docs/proof.md section 4.
+"""Theorem 1 on a real tokenizer.json (byte-level BPE, e.g. BrahmicTokenizer-131K). See proof.md section 4.
 
 usage: python real_tokenizer_check.py <dir with tokenizer.json and special_tokens_map.json> [out.json]
 

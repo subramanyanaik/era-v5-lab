@@ -2,7 +2,7 @@
 
 The codec itself is the one in the public kronecker-embeddings repository
 (kronecker_embeddings.codec.kronecker_codec). This module adds what the proof in
-docs/proof.md needs on top of it:
+proof.md needs on top of it:
 
   truncate        the cut rule from Lemma 2 (never returns empty for a non-empty token)
   codes           codes for a list of byte strings, using the repository codec

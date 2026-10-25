@@ -1,4 +1,4 @@
-"""Lemma 1: the codec is injective on byte strings of length at most P (docs/proof.md)."""
+"""Lemma 1: the codec is injective on byte strings of length at most P (proof.md)."""
 
 import math
 import random

@@ -1,4 +1,4 @@
-"""Lemma 2: the cut to P bytes is a prefix, is bounded, and keeps whole UTF-8 letters (docs/proof.md)."""
+"""Lemma 2: the cut to P bytes is a prefix, is bounded, and keeps whole UTF-8 letters (proof.md)."""
 
 import random
 
@@ -66,7 +66,7 @@ def test_a_non_empty_token_never_becomes_empty():
 def test_repository_rule_empties_a_partial_start_token_but_ours_does_not():
     # A token that starts with the last byte of a letter. No prefix of it is valid UTF-8,
     # so the repository rule returns b"" and the token would get the all-zero code.
-    # If the first assertion fails one day, upstream fixed the rule: update docs/proof.md.
+    # If the first assertion fails one day, upstream fixed the rule: update proof.md.
     raw = b"\x95" + "ನ್ನಡ".encode() * 6
     assert len(raw) == 73
     assert utf8_safe_truncate(raw, 32) == b""

@@ -1,4 +1,4 @@
-"""Theorem 1: two tokens share a code exactly when their cut byte strings are equal (docs/proof.md).
+"""Theorem 1: two tokens share a code exactly when their cut byte strings are equal (proof.md).
 
 The corollary: every pair of tokens that share a code has a named cause.
 The vocabulary here is synthetic and built to contain every cause. The same check runs on the real
