@@ -18,7 +18,6 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def result():
     pytest.importorskip("tokenizers")
-    from forward import CAUSES
     from real_tokenizer_check import run
 
     return run(Path(tok_dir))
@@ -37,6 +36,8 @@ def test_raw_table_has_no_collision(result, P):
 def test_theorem1_on_decode_table(result, P):
     for dtype in ("float32", "bfloat16"):
         assert result[f"P{P}_decode"][dtype]["partitions_equal"]
+    from forward import CAUSES
+
     causes = result[f"P{P}_decode"]["pair_causes"]
     assert None not in causes  # every colliding pair has a cause
     assert set(causes) <= set(CAUSES)
