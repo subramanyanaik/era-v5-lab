@@ -136,7 +136,7 @@ All 12 tests: `12 passed in 23 s` (CPU, torch).
 
 **BrahmicTokenizer-131K** (`tokenizer.json` sha256 `01d968a7970b029c071b29f060abf6104b66168dedf2ff3b1a0290a545739fff`, 131,072 ids,
 356 special tokens, normalizer null, no byte fallback). Raw bytes come from the vocabulary strings by inverting the GPT-2
-byte-to-unicode map. These are one-off local checks (not in `tests/`) with the same code as the tests (`src/forward.py`).
+byte-to-unicode map. The code is `src/real_tokenizer_check.py` (uses `src/forward.py`) and `tests/test_real_tokenizer.py`; run them as in section 5. The tokenizer files are not in this repository.
 
 | Table fed to the codec | P | distinct codes (of 131,072) | tokens that cannot be produced | pair causes |
 |---|---|---|---|---|
@@ -169,3 +169,15 @@ pytest teams/04-ke2/tests -q
 ```
 
 `tests/conftest.py` also finds a folder named `kronecker-embeddings` next to the lab repository.
+
+On the real tokenizer (needs `pip install tokenizers`; download `tokenizer.json`, `tokenizer_config.json` and
+`special_tokens_map.json` from https://huggingface.co/theschoolofai/BrahmicTokenizer-131K into a folder outside this repository):
+
+```
+set BRAHMIC_TOKENIZER_DIR=<that folder>
+pytest teams/04-ke2/tests/test_real_tokenizer.py -q          # skipped when the variable is not set
+set PYTHONPATH=<path to kronecker-embeddings>/src
+python teams/04-ke2/src/real_tokenizer_check.py %BRAHMIC_TOKENIZER_DIR% results.json
+```
+
+Section 4 gives the expected numbers. All 16 tests pass together with the tokenizer (`16 passed in 144 s`); without it, 12 run and 4 are skipped.
