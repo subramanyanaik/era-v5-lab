@@ -82,6 +82,10 @@ UTF-8, else returns `b""`. On valid UTF-8 it returns the same result as tau_P (a
 at a letter boundary). On a token that is not valid UTF-8, such as one that starts with the last byte of a letter,
 no prefix is valid, so it returns `b""` and the token gets the all-zero code.
 
+**Note on the real vocabulary.** BrahmicTokenizer-131K has no ordinary token longer than 32 bytes (longest: 32; special tokens: at most 20),
+so for P = 32 and P = 64 the cut rule never fires on it and tau_P(r) = r for every token (section 4). The lemma is still needed for
+smaller P, for other tokenizers, and for the provisional tokenizer from G3 (due 28 Oct), whose longest token is not yet known.
+
 **Numerical checks** (`tests/test_lemma2.py`):
 
 | Check | Size | Result |
@@ -98,6 +102,10 @@ raw byte table). Then code(tau_P(r)) = code(tau_P(r')) if and only if tau_P(r) =
 
 **Proof.** (if) The code is a function of the string. (only if) By Lemma 2 (c), both cut strings have at most P bytes,
 so Lemma 1 applies. QED
+
+**Scope.** The theorem is about the strings that a table feeds to the codec. It does not say what a given way of building the table
+feeds. If the table is built with `decode([id])`, partial-letter tokens are fed as U+FFFD and collide (section 4). That is a
+property of the table, not of the codec, and it is why the raw byte table uses the real vocabulary bytes.
 
 **Corollary (causes).** Two different tokens share a code only if the strings fed to the codec become equal after the cut.
 For a pair of tokens, with raw bytes r, r' and fed bytes f, f' (equal to r, r' in the raw byte table), the reason is
@@ -124,16 +132,32 @@ U+FFFD bytes, empty tokens):
 
 All 12 tests: `12 passed in 23 s` (CPU, torch).
 
-## 4. What this does not cover (yet)
+## 4. The real tokenizer, and what this does not cover
 
-- **The real tokenizer.** All checks use random or synthetic data. The same two comparisons (groups by code equal groups by
-  cut string; every pair has a cause) run on BrahmicTokenizer-131K once G3 shares it.
-- **Partial-letter tokens and special tokens** are handled only as stated: partial tokens keep their real bytes, and special
-  tokens use their literal text. Whether to keep `<s>` text and the special token apart is a policy decision.
-- **Normalisation.** NFC or NFKC changes the bytes, so it changes the codes. The proof starts from the bytes.
+**BrahmicTokenizer-131K** (`tokenizer.json` sha256 `01d968a7970b029c071b29f060abf6104b66168dedf2ff3b1a0290a545739fff`, 131,072 ids,
+356 special tokens, normalizer null, no byte fallback). Raw bytes come from the vocabulary strings by inverting the GPT-2
+byte-to-unicode map. These are one-off local checks (not in `tests/`) with the same code as the tests (`src/forward.py`).
+
+| Table fed to the codec | P | distinct codes (of 131,072) | tokens that cannot be produced | pair causes |
+|---|---|---|---|---|
+| raw vocabulary bytes | 32 and 64, fp32 and bf16 | 131,072 | 0 | none |
+| `decode([id])`-style bytes (modelled, see below) | 32 and 64 | 129,931 | 1,141 in 10 groups (largest 658, 396, 82) | all `bad_bytes_in` |
+
+- Groups by code equal groups by cut string in all four cases, as Theorem 1 says. Every pair in the 10 groups has the cause `bad_bytes_in`;
+  `empty`, `same_raw` and `truncation` do not occur.
+- The longest ordinary token is 32 bytes (none over 32), so P = 32 and P = 64 give identical results and no token is cut.
+- 1,306 tokens (1.0%) hold only part of a letter (not valid UTF-8). 197 of them start with a stray continuation byte. Only 16 touch the
+  Kannada lead bytes `E0 B2` / `E0 B3`. The real U+FFFD token is id 99666.
+- Hash of the raw table (for each id: the id as 4 bytes, the length as 2 bytes, then the bytes): `18c7f6a382fd6668ec73f56e589fbfbc13fec7c6ad5403a2d79ba6198ecc0d3c`.
+
+**Not covered.**
+- **The decode-style row is a model.** It applies Python's replacement of invalid bytes to the raw bytes. The real HF `decode([id])` has not been run.
+- **Lemma 2's cut branch** is checked only on random and synthetic strings, since no real token is longer than 32 bytes.
+- **Special tokens** are included here as their literal text. The final policy (the G10 list, due 31 Oct) can change what is fed to the
+  codec, but not the theorem. Whether to keep `<s>` text and the special token apart is a policy decision.
+- **Normalisation.** NFC or NFKC changes the bytes, so it changes the codes. The tokenizer has no normalizer, so this happens in the data pipeline. The proof starts from the bytes.
 - **Exact arithmetic.** The proof is exact. The checks cover fp32 and bf16 and show that the lit and unlit values stay apart.
 - **Decoding from a predicted vector** (noisy input, margins, tau) is week 2 and is not part of this proof.
-
 ## 5. Run it
 
 ```
