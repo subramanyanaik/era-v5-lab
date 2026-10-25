@@ -141,7 +141,7 @@ byte-to-unicode map. These are one-off local checks (not in `tests/`) with the s
 | Table fed to the codec | P | distinct codes (of 131,072) | tokens that cannot be produced | pair causes |
 |---|---|---|---|---|
 | raw vocabulary bytes | 32 and 64, fp32 and bf16 | 131,072 | 0 | none |
-| `decode([id])`-style bytes (modelled, see below) | 32 and 64 | 129,931 | 1,141 in 10 groups (largest 658, 396, 82) | all `bad_bytes_in` |
+| `decode([id])` bytes from the repo's `token_id_to_bytes` and the real `tokenizers` decoder | 32 and 64 | 129,931 | 1,141 in 10 groups (largest 658, 396, 82) | all `bad_bytes_in` |
 
 - Groups by code equal groups by cut string in all four cases, as Theorem 1 says. Every pair in the 10 groups has the cause `bad_bytes_in`;
   `empty`, `same_raw` and `truncation` do not occur.
@@ -151,7 +151,7 @@ byte-to-unicode map. These are one-off local checks (not in `tests/`) with the s
 - Hash of the raw table (for each id: the id as 4 bytes, the length as 2 bytes, then the bytes): `18c7f6a382fd6668ec73f56e589fbfbc13fec7c6ad5403a2d79ba6198ecc0d3c`.
 
 **Not covered.**
-- **The decode-style row is a model.** It applies Python's replacement of invalid bytes to the raw bytes. The real HF `decode([id])` has not been run.
+- **The decoder is `tokenizers` 0.23.1,** the Rust engine behind HF fast tokenizers, called through a thin adapter (only the four named specials take the literal-text path). `transformers` itself was not run. The bytes fed equal a plain model (invalid bytes replaced by U+FFFD) for all 131,072 ids. The repo's `utf8_safe_truncate` gives the same groups as tau_P here.
 - **Lemma 2's cut branch** is checked only on random and synthetic strings, since no real token is longer than 32 bytes.
 - **Special tokens** are included here as their literal text. The final policy (the G10 list, due 31 Oct) can change what is fed to the
   codec, but not the theorem. Whether to keep `<s>` text and the special token apart is a policy decision.
