@@ -62,6 +62,13 @@ gets a medicine too (Medicine 7). B4 (5), G1 (3), C1 (3) and C2 (1) are not abov
 | 7 | A3 mojibake (stray `Â`) | `strip_stray_a_circumflex` | fix | 5 | 0 | 0 | PASS | 4 / 0 (4 edits) | 0 | 1 (left to B2) |
 | | All seven in order | pipeline | | | 0 | 0 | PASS | 233 / 6 | | |
 
+**All seven in order** (Data B `harm_test_indic.py`, ALL IN ORDER): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+- Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+- ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+- Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+
+The sha256 above is of this sheet just before these result lines were pasted in; the code blocks did not change.
+
 On the safety checks, all medicines had **0 problems**, and the pipeline is idempotent. All 39 hand-written cases pass.
 
 ---
@@ -99,7 +106,11 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
    ```
 3. **Action:** Fix the text. Only the one character changes, and the doc is kept.
 4. **Harm test:**
-   - **Gold:** 0 of 11 changed and 0 dropped (**PASS**); on my 27 clean docs, 0 and 0.
+   - **Gold** (Data B `harm_test_indic.py`, pasted from its `--md-out` block): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+     - Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+     - ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+     - Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+   - **Second check** (my own harm test, 27 docs I labelled `clean`): 0 changed and 0 dropped.
    - **Pack:** it changes exactly the 167 docs labelled G4, with 0 off-target and 0 missed. Every edit is one
      ಃ → `:`.
 5. **Side effects:**
@@ -136,7 +147,11 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
      because this pack is synthetic and the English source exists. I have not run it, since it needs a model
      download.
 4. **Harm test:**
-   - **Gold:** 0 of 11 changed and 0 dropped (**PASS**); on my 27 clean docs, 0 and 0.
+   - **Gold** (Data B `harm_test_indic.py`, pasted from its `--md-out` block): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+     - Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+     - ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+     - Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+   - **Second check** (my own harm test, 27 docs I labelled `clean`): 0 changed and 0 dropped.
    - **Pack:** it touches 49 docs, all 48 labelled ones plus 1 off-target, and misses 0. It never removes a letter
      or a digit.
 5. **Side effects:**
@@ -203,7 +218,11 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
    dropped. Docs that were labelled `drop` because almost nothing is left are dropped by the reader's verdict, not
    by this rule.
 4. **Harm test:**
-   - **Gold:** 0 of 11 changed and 0 dropped (**PASS**); on my 27 clean docs, 0 and 0.
+   - **Gold** (Data B `harm_test_indic.py`, pasted from its `--md-out` block): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+     - Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+     - ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+     - Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+   - **Second check** (my own harm test, 27 docs I labelled `clean`): 0 changed and 0 dropped.
    - **Pack:** it changes 59 docs, 55 of them on target and 4 off-target, and misses 17.
    - The largest trim is 232 characters over 5 lines (a proof whose formulas were dropped, leaving four ಃ lead-ins).
      The median trim is 39 characters.
@@ -271,7 +290,11 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
    My labels say `fix` for these six because the rest of their text reads well. The threshold of 3 is a proposal
    (asked to TSAI).
 4. **Harm test:**
-   - **Gold:** 0 of 11 changed and 0 dropped (**PASS**); on my 27 clean docs, 0 and 0.
+   - **Gold** (Data B `harm_test_indic.py`, pasted from its `--md-out` block): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+     - Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+     - ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+     - Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+   - **Second check** (my own harm test, 27 docs I labelled `clean`): 0 changed and 0 dropped.
    - **Pack:** it touches exactly the 38 labelled docs (32 fixed, 6 dropped), with 0 off-target and 0 missed.
 5. **Side effects:**
    - The sentence still lacks the value. "…in males <ಐ. ಡಿ. 2> mm…" becomes "…in males mm…", so a unit can be left
@@ -341,7 +364,11 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
    - The other option would be to drop every flagged doc. That loses docs whose other text is usable, so I do
      not propose it.
 4. **Harm test:**
-   - **Gold:** 0 of 11 changed (**PASS**); on my 27 clean docs, 0 changed or flagged.
+   - **Gold** (Data B `harm_test_indic.py`, pasted from its `--md-out` block): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+     - Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+     - ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+     - Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+   - **Second check** (my own harm test, 27 docs I labelled `clean`): 0 changed or flagged.
    - **Pack:** the fix changes 12 docs (14 initials), all labelled A6, for example `54f770edbfb0f27e`
      (`i.ಇ.ಪಳೆಯುಳಿಕೆ` → `ಐ.ಇ.ಪಳೆಯುಳಿಕೆ` at offset 491), `605c195dc5422a06` (`(i.ಇ. ಪೋಪ್)` at offset 70565) and
      `b497ade9ed6f64c3` (`f.ಸಿ.` at offset 28). Fix and flag together touch 25 docs, all labelled A6, with 0
@@ -384,7 +411,11 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
    ```
 3. **Action:** Fix the text by removing the tags. The doc is kept.
 4. **Harm test:**
-   - **Gold:** 0 of 11 changed and 0 dropped (**PASS**); on my 27 clean docs, 0 and 0.
+   - **Gold** (Data B `harm_test_indic.py`, pasted from its `--md-out` block): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+     - Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+     - ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+     - Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+   - **Second check** (my own harm test, 27 docs I labelled `clean`): 0 changed and 0 dropped.
    - **Pack:** it changes 13 docs, all labelled B2, with 0 off-target. It misses 1, `f1161ea20322b1f3`, where
      `<ವೀಸಾ` is a broken tag with no closing `>` that runs into prose; it is left for a reader.
    - Maths such as `a < b > c` and `(p <0.05)` is not touched.
@@ -421,7 +452,11 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
    ```
 3. **Action:** Fix the text. Only the `Â` and the spaces or quotes around it are removed; the doc is kept.
 4. **Harm test:**
-   - **Gold:** 0 of 11 changed and 0 dropped (**PASS**); on my 27 clean docs, 0 and 0. No gold doc has an `Â`.
+   - **Gold** (Data B `harm_test_indic.py`, pasted from its `--md-out` block): gold set of 11 documents (ind-kn-sangraha-s 11), medicine.md sha256 dc9084016893; rule: changed or dropped at most 1% or 1 document, whichever is more.
+     - Changed 0 of 11 (0.00%). Dropped 0 of 11 (0.00%). **PASS**
+     - ZWJ/ZWNJ audit: 0 changed documents with a different count. **PASS**
+     - Normal-form audit: 0 changed documents left NFC or lost a compatibility character. **PASS**
+   - **Second check** (my own harm test, 27 docs I labelled `clean`): 0 changed and 0 dropped. No gold doc has an `Â`.
    - **Pack:** it changes 4 docs (4 edits), all labelled A3, with 0 off-target. The fifth A3 doc,
      `5f6f044745aeb4f4`, has its 7 `Â` only inside `<> </Â>`, which B2 removes earlier in the pipeline.
    - In `a84cbd8f664d1816`, `(<unk> Â, ಅಹಿರು ಅಕ್ಷರಗಳು)` becomes `(ಅಹಿರು ಅಕ್ಷರಗಳು)` after B3, A3 and D4.
@@ -429,3 +464,10 @@ On the safety checks, all medicines had **0 problems**, and the pipeline is idem
    - The lost character is not restored: in `b6fa26245e5bbee0` the pseudocode arrow is gone (`s ಮೊದಲ (p, c)`),
      and in `3da04151703f4541` the kanji is gone, so the sentence lists one item fewer.
    - A text that really uses `Â` on its own (a single-letter label) would lose it. None occurs in this pack.
+
+## Observations
+
+- **F2 benchmark leak: none found.** G9's `teams/09-evaluation/decontam/decontam_check.py` on all 500 docs with the
+  full fingerprint set v1 (set_sha256 `11e290a44d1467875fdf8bebc55eab21f0a6367f411aab98a4a027a546fd372e`; it covers
+  FLORES-200, IN22-Gen, IN22-Conv, MILU and the English, code and maths benchmarks): **0 of 500 docs flagged**.
+  So no doc is labelled F2, and F2 needs no medicine.
